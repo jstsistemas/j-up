@@ -1,0 +1,1154 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>j-up</title>
+<style>
+  :root{
+    --bg:#eef1f6; --panel:#ffffff; --ink:#1b2430; --ink-soft:#5b6879;
+    --line:#c6ccd6; --wall:#16202c; --accent:#1e6fd9; --accent-soft:#e4eefb;
+    --given:#1e6fd9; --user:#16202c; --hint:#0f8a5f; --bad:#d3382f;
+    --seg:#f2f7fe; --sel:#cfe3fb; --pad:#f7f9fc;
+    --cell:56px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:14px/1.4 "Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    -webkit-font-smoothing:antialiased;
+    touch-action:manipulation;                 /* sin zoom por doble tap */
+    -webkit-tap-highlight-color:transparent;
+  }
+  .app{width:100%; max-width:980px; padding:10px 16px 16px}
+
+  header{display:flex; align-items:baseline; gap:10px; margin-bottom:8px}
+  header h1{margin:0; font-size:20px; letter-spacing:.5px}
+  header .sub{color:var(--ink-soft); font-size:12px}
+  header .spacer{flex:1}
+  #timer{font-variant-numeric:tabular-nums; font-size:16px; color:var(--ink-soft)}
+
+  .toolbar{
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:8px 10px; margin-bottom:10px;
+  }
+  .toolbar label{font-size:12px; color:var(--ink-soft)}
+  select{
+    font:inherit; padding:4px 6px; border:1px solid var(--line); border-radius:6px;
+    background:#fff; color:var(--ink);
+  }
+  .btn{
+    font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px;
+    background:#fff; color:var(--ink); cursor:pointer; user-select:none;
+  }
+  .btn:hover{background:#f2f5fa}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{background:#1a62c0}
+  .btn.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+  .toolbar .gap{flex:1}
+
+  .stage{display:flex; gap:16px; align-items:flex-start}
+
+  .board{
+    display:grid; gap:1px; background:var(--line);
+    border:3px solid var(--wall); width:max-content;
+    grid-template-columns:repeat(var(--n),var(--cell));
+    touch-action:manipulation;
+  }
+  .cell{
+    position:relative; width:var(--cell); height:var(--cell);
+    background:var(--panel); cursor:pointer; overflow:visible;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .cell.inseg{background:var(--seg)}
+  .cell.sel{background:var(--sel)}
+  .cell.bad{background:#fbe3e1}
+  .cell.wr::after{content:"";position:absolute;top:-1px;bottom:-1px;right:-3px;width:5px;background:var(--wall);z-index:4}
+  .cell.wb::before{content:"";position:absolute;left:-1px;right:-1px;bottom:-3px;height:5px;background:var(--wall);z-index:4}
+  .val{
+    font-weight:600; font-size:calc(var(--cell)*.52); line-height:1;
+    color:var(--user); font-variant-numeric:tabular-nums;
+  }
+  .val.d2{font-size:calc(var(--cell)*.40); letter-spacing:-.5px}
+  .cell.given .val{color:var(--given); font-weight:700}
+ .cell.bad .val{color:var(--bad)}
+
+  .pad{
+    background:var(--pad); border:1px solid var(--line); border-radius:8px;
+    padding:10px; display:flex; flex-direction:column; gap:8px; width:172px; flex:0 0 auto;
+  }
+  .pad .title{font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--ink-soft)}
+  .nums{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+  .nums button{
+    font:600 20px/1 "Segoe UI",system-ui,sans-serif; height:44px;
+    border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink);
+    cursor:pointer; font-variant-numeric:tabular-nums;
+  }
+  .nums button:hover{background:var(--accent-soft); border-color:var(--accent)}
+  .nums button.used{color:var(--ink-soft)}
+  /* rechazo: no se apagan los botones que no van (seria cantar la respuesta),
+     se los deja tocar y el que no corresponde pega el flash */
+  @keyframes nope{
+    0%{transform:translateX(0)} 25%{transform:translateX(-4px)}
+    75%{transform:translateX(4px)} 100%{transform:translateX(0)}
+  }
+  .btn.nope, .nums button.nope{
+    animation:nope .22s ease; background:#fbe3e1; border-color:var(--bad); color:var(--bad);
+  }
+  .pad .wide{width:100%}
+  .pad .sep{height:1px; background:var(--line); margin:2px 0}
+
+  .status{
+    margin-top:10px; min-height:22px; font-size:13px; color:var(--ink-soft);
+    display:flex; align-items:center; gap:10px;
+  }
+  .status.win{color:var(--hint); font-weight:600}
+  .status.err{color:var(--bad)}
+
+  dialog{
+    border:1px solid var(--line); border-radius:10px; padding:0; max-width:520px;
+    color:var(--ink); box-shadow:0 12px 40px rgba(0,0,0,.22);
+  }
+  dialog::backdrop{background:rgba(20,28,38,.45)}
+  dialog .dlg{padding:18px 20px}
+  dialog h2{margin:0 0 10px; font-size:17px}
+  dialog p{margin:0 0 8px; font-size:13px; line-height:1.5}
+  dialog ul{margin:0 0 10px 18px; padding:0; font-size:13px; line-height:1.55}
+  dialog .foot{display:flex; justify-content:flex-end; margin-top:8px}
+  .ex{display:inline-grid; grid-template-columns:repeat(4,26px); gap:1px; background:var(--line);
+      border:2px solid var(--wall); margin:4px 0 10px}
+  .ex div{background:#fff; height:26px; display:flex; align-items:center; justify-content:center;
+      font:600 13px/1 "Segoe UI",sans-serif}
+  .ex .wr{box-shadow:3px 0 0 0 var(--wall)}
+  .ex .wb{box-shadow:0 3px 0 0 var(--wall)}
+
+  #busy{
+    position:fixed; inset:0; background:rgba(238,241,246,.82); display:none;
+    align-items:center; justify-content:center; font-size:15px; color:var(--ink-soft); z-index:50;
+  }
+  #busy.on{display:flex}
+
+  /* Celular: la botonera pasa abajo del tablero, siempre en 2 lineas
+     (--padcols = mitad de los numeros, lo setea layout()). */
+  @media (max-width:860px){
+    body{align-items:stretch}
+    .app{max-width:none; padding:6px 8px 10px}
+    header{margin-bottom:6px; gap:8px}
+    header h1{font-size:17px}
+    header .sub{display:none}
+    #timer{font-size:15px}
+    .toolbar{padding:6px; gap:5px; margin-bottom:8px; justify-content:center}
+    .toolbar label{font-size:11px}
+    .toolbar .gap{flex-basis:100%; height:0}
+    .btn{padding:7px 10px; font-size:13px}
+    select{padding:5px 4px; font-size:13px}
+    .stage{flex-direction:column; align-items:center; gap:10px}
+    .pad{width:100%; max-width:none; padding:8px; gap:8px}
+    .pad .title, .pad .sep{display:none}
+    .nums{grid-template-columns:repeat(var(--padcols,5),1fr); gap:6px}
+    .nums button{height:46px; font-size:19px}
+    .status{margin-top:6px; justify-content:center}
+  }
+  /* pantallas bajas: que no haya que scrollear para ver la botonera */
+  @media (max-width:860px) and (max-height:640px){
+    .nums button{height:38px; font-size:17px}
+    .toolbar{margin-bottom:5px}
+  }
+</style>
+
+<div class="app">
+  <header>
+    <h1>j-up</h1>
+    <span class="sub">1..N entre paredes</span>
+    <span class="spacer"></span>
+    <span id="timer">00:00</span>
+  </header>
+
+  <div class="toolbar">
+    <label for="size">Tama&ntilde;o</label>
+    <select id="size">
+      <option>6</option><option>7</option><option selected>8</option><option>9</option><option>10</option>
+    </select>
+    <label for="diff">Dificultad</label>
+    <select id="diff">
+      <option value="1">F&aacute;cil</option>
+      <option value="2" selected>Medio</option>
+      <option value="3">Dif&iacute;cil</option>
+      <option value="4">Experto</option>
+    </select>
+    <button class="btn primary" id="btnNew">Nuevo</button>
+    <span class="gap"></span>
+    <button class="btn" id="btnUndo">Deshacer</button>
+    <button class="btn" id="btnCheck">Verificar</button>
+    <button class="btn" id="btnReset">Reiniciar</button>
+    <button class="btn" id="btnHelp">?</button>
+  </div>
+
+  <div class="stage">
+    <div id="board" class="board"></div>
+    <aside class="pad">
+      <div class="title">N&uacute;meros</div>
+      <div class="nums" id="nums"></div>
+      <button class="btn wide" id="btnErase">Borrar</button>
+    </aside>
+  </div>
+
+  <div class="status" id="status"></div>
+</div>
+
+<dialog id="help"><div class="dlg">
+  <h2>C&oacute;mo se juega</h2>
+  <p>Las paredes gruesas parten la grilla en <b>tramos</b>: cada secuencia de casillas seguidas,
+     horizontal o vertical, que no cruza ninguna pared.</p>
+  <ul>
+    <li>Un tramo de largo <b>L</b> lleva exactamente los n&uacute;meros <b>1 a L</b>, uno de cada uno.</li>
+    <li>Cada casilla pertenece a dos tramos: el horizontal y el vertical.</li>
+    <li>No se repite dentro de un tramo. <b>S&iacute;</b> puede repetirse dentro de una fila o
+        columna completa, si son tramos distintos.</li>
+    <li>Un tramo de una sola casilla siempre lleva 1.</li>
+  </ul>
+  <p>Ejemplo resuelto de 4&times;4 (las paredes marcan los cortes):</p>
+  <div class="ex" id="exGrid"></div>
+  <p><b>Manejo:</b> click en una casilla y despu&eacute;s click en el n&uacute;mero de la derecha.
+     Volver a tocar el mismo n&uacute;mero lo borra; si el n&uacute;mero no entra en esa casilla,
+     el bot&oacute;n pega un flash y no lo toma. Con teclado: 1&ndash;9, el <b>0</b> es el 10,
+     flechas para moverse, Supr borra.</p>
+  <div class="foot"><button class="btn primary" id="helpClose">Cerrar</button></div>
+</div></dialog>
+
+<div id="busy">Generando puzzle&hellip;</div>
+
+<script>
+// ==ENGINE-START==
+// Motor puro, sin DOM. Se testea aparte en Node extrayendo este bloque.
+
+function makeRng(seed){
+  let s = (seed >>> 0) || 0x9e3779b9;
+  return function(){
+    s ^= s << 13; s >>>= 0;
+    s ^= s >>> 17;
+    s ^= s << 5;  s >>>= 0;
+    return s / 4294967296;
+  };
+}
+function shuffle(a, rng){
+  for(let i=a.length-1;i>0;i--){ const j=(rng()*(i+1))|0; const t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+
+const BITPOS = (function(){ const t={}; for(let v=1;v<=16;v++) t[1<<v]=v; return t; })();
+function popcount(x){ let c=0; while(x){ x&=x-1; c++; } return c; }
+function bitsOf(m){ const r=[]; for(let v=1;v<=16;v++) if(m&(1<<v)) r.push(v); return r; }
+
+// --- estructura: paredes -> tramos ---------------------------------------
+// vW[r*(N-1)+c] = pared entre (r,c) y (r,c+1)
+// hW[r*N+c]     = pared entre (r,c) y (r+1,c)
+function buildCtx(N, vW, hW){
+  const n = N*N;
+  const segs = [];
+  const hSeg = new Int32Array(n).fill(-1);
+  const vSeg = new Int32Array(n).fill(-1);
+
+  for(let r=0;r<N;r++){
+    let start=0;
+    for(let c=0;c<N;c++){
+      const cut = (c===N-1) || vW[r*(N-1)+c];
+      if(cut){
+        const cells=[]; for(let k=start;k<=c;k++) cells.push(r*N+k);
+        const id=segs.length; segs.push({cells:cells, len:cells.length, dir:0});
+        for(let k=0;k<cells.length;k++) hSeg[cells[k]]=id;
+        start=c+1;
+      }
+    }
+  }
+  for(let c=0;c<N;c++){
+    let start=0;
+    for(let r=0;r<N;r++){
+      const cut = (r===N-1) || hW[r*N+c];
+      if(cut){
+        const cells=[]; for(let k=start;k<=r;k++) cells.push(k*N+c);
+        const id=segs.length; segs.push({cells:cells, len:cells.length, dir:1});
+        for(let k=0;k<cells.length;k++) vSeg[cells[k]]=id;
+        start=r+1;
+      }
+    }
+  }
+  const maxv = new Int32Array(n);
+  for(let i=0;i<n;i++) maxv[i] = Math.min(segs[hSeg[i]].len, segs[vSeg[i]].len);
+  const baseDom = new Int32Array(n);
+  for(let i=0;i<n;i++) baseDom[i] = ((1<<(maxv[i]+1))-1) & ~1;
+
+  return {N:N, n:n, vW:vW, hW:hW, segs:segs, hSeg:hSeg, vSeg:vSeg, maxv:maxv, baseDom:baseDom, nodes:0};
+}
+
+function assign(ctx, dom, val, i, v){
+  if(val[i]===v) return true;
+  if(val[i]) return false;
+  if(!(dom[i] & (1<<v))) return false;
+  val[i]=v; dom[i]=1<<v;
+  const clear = ~(1<<v);
+  const two = [ctx.segs[ctx.hSeg[i]], ctx.segs[ctx.vSeg[i]]];
+  for(let t=0;t<2;t++){
+    const cells = two[t].cells;
+    for(let k=0;k<cells.length;k++){
+      const j=cells[k]; if(j===i) continue;
+      if(val[j]===v) return false;
+      dom[j] &= clear;
+      if(!val[j] && dom[j]===0) return false;
+    }
+  }
+  return true;
+}
+
+function propagate(ctx, dom, val){
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(let i=0;i<ctx.n;i++){
+      if(val[i]) continue;
+      const d=dom[i];
+      if(d===0) return false;
+      if((d&(d-1))===0){
+        if(!assign(ctx,dom,val,i,BITPOS[d])) return false;
+        changed=true;
+      }
+    }
+    for(let s=0;s<ctx.segs.length;s++){
+      const seg=ctx.segs[s], cells=seg.cells;
+      for(let v=1;v<=seg.len;v++){
+        const bit=1<<v;
+        let cnt=0, pos=-1, placed=false;
+        for(let k=0;k<cells.length;k++){
+          const i=cells[k];
+          if(val[i]===v){ placed=true; break; }
+          if(!val[i] && (dom[i]&bit)){ cnt++; pos=i; }
+        }
+        if(placed) continue;
+        if(cnt===0) return false;
+        if(cnt===1){
+          if(!assign(ctx,dom,val,pos,v)) return false;
+          changed=true;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+const NODE_CAP = 400000;
+function search(ctx, dom, val, limit, rng, out){
+  if(++ctx.nodes > NODE_CAP) throw new Error("nodecap");
+  if(!propagate(ctx,dom,val)) return 0;
+  let best=-1, bestC=99;
+  for(let i=0;i<ctx.n;i++){
+    if(val[i]) continue;
+    const c=popcount(dom[i]);
+    if(c<bestC){ bestC=c; best=i; if(c===2) break; }
+  }
+  if(best<0){ if(out && !out.sol) out.sol=Array.prototype.slice.call(val); return 1; }
+  let total=0;
+  const cands=bitsOf(dom[best]);
+  if(rng) shuffle(cands,rng);
+  for(let k=0;k<cands.length;k++){
+    const d2=dom.slice(), v2=val.slice();
+    if(assign(ctx,d2,v2,best,cands[k])){
+      total += search(ctx,d2,v2,limit-total,rng,out);
+      if(total>=limit) return total;
+    }
+  }
+  return total;
+}
+
+function startState(ctx, given){
+  const dom=ctx.baseDom.slice();
+  const val=new Int32Array(ctx.n);
+  if(given){
+    for(let i=0;i<ctx.n;i++){
+      if(given[i]){
+        if(!assign(ctx,dom,val,i,given[i])) return null;
+      }
+    }
+  }
+  return {dom:dom, val:val};
+}
+
+function countSolutions(ctx, given, limit, rng, out){
+  const st=startState(ctx,given);
+  if(!st) return 0;
+  ctx.nodes=0;
+  return search(ctx, st.dom, st.val, limit||2, rng||null, out||null);
+}
+
+// --- medidor de dificultad ------------------------------------------------
+// Aca casi todo sale con "singles", asi que graduar por tecnica no discrimina:
+// el 98% de los tableros daria "facil". Lo que cuesta es VER el paso -- barrer
+// un tramo de 7 no es lo mismo que uno de 2 -- y tener una sola deduccion a
+// mano en todo el tablero no es lo mismo que tener quince.
+function humanSolve(ctx, given){
+  const st=startState(ctx,given);
+  if(!st) return {solved:false, level:4, hardest:99, scarcity:0, adv:0};
+  const dom=st.dom, val=st.val;
+  let used=0;
+
+  // Casillas deducibles en este momento, cada una con el costo del camino mas
+  // barato para llegarle. Se cuenta una vez por casilla: la misma casilla sale
+  // como single desnudo y como escondido por sus dos tramos, y contarla tres
+  // veces hacia parecer que siempre hay de donde agarrar.
+  const bestCost=new Int32Array(ctx.n), bestVal=new Int32Array(ctx.n);
+  function collect(out){
+    let cnt=0;
+    for(let i=0;i<ctx.n;i++) bestCost[i]=-1;
+    for(let i=0;i<ctx.n;i++){
+      if(val[i]) continue;
+      const d=dom[i];
+      if(d===0) return -1;
+      if((d&(d-1))===0){
+        bestCost[i]=(ctx.maxv[i]===1?0:2); bestVal[i]=BITPOS[d]; cnt++;
+      }
+    }
+    for(let s=0;s<ctx.segs.length;s++){
+      const seg=ctx.segs[s], cells=seg.cells;
+      for(let v=1;v<=seg.len;v++){
+        const bit=1<<v; let c=0,pos=-1,placed=false;
+        for(let k=0;k<cells.length;k++){
+          const i=cells[k];
+          if(val[i]===v){ placed=true; break; }
+          if(!val[i] && (dom[i]&bit)){ c++; pos=i; }
+        }
+        if(placed) continue;
+        if(c===0) return -1;
+        if(c===1){
+          if(bestCost[pos]<0){ bestCost[pos]=seg.len; bestVal[pos]=v; cnt++; }
+          else if(seg.len<bestCost[pos]){ bestCost[pos]=seg.len; bestVal[pos]=v; }
+        }
+      }
+    }
+    if(cnt){
+      let pick=-1;
+      for(let i=0;i<ctx.n;i++){
+        if(bestCost[i]<0) continue;
+        if(pick<0 || bestCost[i]<bestCost[pick]) pick=i;
+      }
+      out.cell=pick; out.val=bestVal[pick]; out.cost=bestCost[pick];
+    }
+    return cnt;
+  }
+
+  function nakedPairs(){
+    let did=false;
+    for(let s=0;s<ctx.segs.length;s++){
+      const cells=ctx.segs[s].cells;
+      for(let a=0;a<cells.length;a++){
+        const i=cells[a];
+        if(val[i] || popcount(dom[i])!==2) continue;
+        for(let b=a+1;b<cells.length;b++){
+          const j=cells[b];
+          if(val[j] || dom[j]!==dom[i]) continue;
+          const clear=~dom[i];
+          for(let k=0;k<cells.length;k++){
+            const m=cells[k];
+            if(m===i||m===j||val[m]) continue;
+            const before=dom[m]; dom[m]&=clear;
+            if(dom[m]!==before){ did=true; if(dom[m]===0) return null; }
+          }
+        }
+      }
+    }
+    return did;
+  }
+
+  // si en el tramo A el valor v solo cabe en casillas que comparten el tramo
+  // perpendicular B, entonces v sale del resto de B
+  function pointing(){
+    let did=false;
+    for(let s=0;s<ctx.segs.length;s++){
+      const seg=ctx.segs[s], cells=seg.cells;
+      const perp = seg.dir===0 ? ctx.vSeg : ctx.hSeg;
+      for(let v=1;v<=seg.len;v++){
+        const bit=1<<v;
+        let other=-1, ok=true, placed=false, any=false;
+        for(let k=0;k<cells.length;k++){
+          const i=cells[k];
+          if(val[i]===v){ placed=true; break; }
+          if(val[i] || !(dom[i]&bit)) continue;
+          any=true;
+          if(other<0) other=perp[i];
+          else if(other!==perp[i]){ ok=false; break; }
+        }
+        if(placed || !ok || !any || other<0) continue;
+        const target=ctx.segs[other];
+        if(target.len < v) continue;
+        for(let k=0;k<target.cells.length;k++){
+          const m=target.cells[k];
+          if(val[m]) continue;
+          if((seg.dir===0 ? ctx.hSeg[m] : ctx.vSeg[m])===s) continue;
+          const before=dom[m]; dom[m]&=~bit;
+          if(dom[m]!==before){ did=true; if(dom[m]===0) return null; }
+        }
+      }
+    }
+    return did;
+  }
+
+  let hardest=0, sumOpts=0, sumCost=0, pasos=0, caros=0;
+  const CARO=umbralCaro(ctx.N);
+  const mv={cell:-1, val:0, cost:0};
+  function fail(){
+    return {solved:false, level:4, hardest:hardest, adv:used, caros:caros,
+            esfuerzo: pasos ? sumCost/pasos : 0,
+            opts: pasos ? sumOpts/pasos : 0};
+  }
+
+  for(;;){
+    const cnt=collect(mv);
+    if(cnt<0) return fail();
+    if(cnt===0){
+      const a=nakedPairs();
+      if(a===null) return fail();
+      if(a){ used++; continue; }
+      const b=pointing();
+      if(b===null) return fail();
+      if(b){ used++; continue; }
+      break;                       // ya no queda nada deducible: hace falta ensayo
+    }
+    sumOpts+=cnt; pasos++;
+    sumCost+=mv.cost;
+    if(mv.cost>=CARO) caros++;             // barrido de un tramo largo
+    if(mv.cost>hardest) hardest=mv.cost;   // el humano agarra lo mas barato
+    if(!assign(ctx,dom,val,mv.cell,mv.val)) return fail();
+  }
+  for(let i=0;i<ctx.n;i++) if(!val[i]) return fail();
+
+  // Ni el maximo ni el promedio sirven de escala: con el maximo un unico paso
+  // caro tira todo el tablero a "dificil", y el promedio lo diluyen los muchos
+  // pasos baratos. Lo que se siente al jugar es CUANTAS veces hubo que barrer
+  // un tramo largo entero.
+  const opts = pasos ? sumOpts/pasos : 99;
+  const esfuerzo = pasos ? sumCost/pasos : 0;
+  let level;
+  if(used>0 || caros>Math.ceil(ctx.N*0.75)) level=3;
+  else if(caros>Math.ceil(ctx.N/4)) level=2;
+  else level=1;
+  return {solved:true, level:level, hardest:hardest, caros:caros,
+          esfuerzo:esfuerzo, opts:opts, adv:used};
+}
+// A partir de que largo de tramo el barrido "se siente": en 6x6 son 4 casillas,
+// en 10x10 recien 6.
+function umbralCaro(N){ return Math.max(4, Math.round(N*0.55)); }
+function rateLevel(ctx, given){ return humanSolve(ctx,given).level; }
+
+// --- generacion -----------------------------------------------------------
+// Paredes y solucion se construyen JUNTAS, casilla por casilla de izquierda a
+// derecha y de arriba abajo. Sortear paredes primero y despues buscarles
+// solucion no sirve: casi ninguna configuracion al azar tiene, y no hay
+// filtro barato que lo anticipe. Armandolas a la vez, el tablero que sale
+// tiene solucion si o si (la que se construyo).
+function highBit(mask){
+  let h=0;
+  for(let v=1;v<=16;v++) if(mask&(1<<v)) h=v;
+  return h;
+}
+function fullSet(L){ return ((1<<(L+1))-1) & ~1; }   // {1..L} como bitmask
+
+// probabilidad de cerrar un tramo que ya tiene k casillas (largo medio ~2.9)
+function pCut(k){ return Math.min(0.92, 0.06 + 0.13*k); }
+
+// forceRow: una fila sin ninguna pared interna, y va SIEMPRE la 0 porque el
+// constructor avanza de arriba abajo y asi la resuelve antes de comprometer
+// nada. Es lo que hace que el numero N se use: la fila lleva 1..N, y la casilla
+// que se queda con el N obliga a su columna a ser entera tambien; de ahi para
+// abajo la poda va pidiendo columnas cada vez menos largas -- el escalonado que
+// tiene el 4x4 del instructivo. La variedad se recupera despues, espejando el
+// tablero terminado (ver espejar()).
+function buildBoard(N, rng, maxLen, stepCap, forceRow, forceCol){
+  const n=N*N;
+  const vW=new Uint8Array(N*(N-1));
+  const hW=new Uint8Array((N-1)*N);
+  const val=new Int32Array(n);
+  const vSet=new Int32Array(N), vLen=new Int32Array(N);
+  let steps=0;
+
+  function rec(i, hSet, hLen){
+    if(i===n) return true;
+    if(++steps > stepCap) return false;
+    const r=(i/N)|0, c=i%N;
+    const topeH = (r===forceRow) ? N : maxLen;
+    const topeV = (c===forceCol) ? N : maxLen;
+
+    // cortar a la izquierda cierra el tramo horizontal: tiene que estar completo
+    let leftOpts;
+    if(c===0) leftOpts=[1];
+    else if(r===forceRow) leftOpts=[0];          // la fila entera no se corta
+    else{
+      const canCut = (hSet===fullSet(hLen));
+      const canGo  = (hLen<topeH);
+      if(canCut&&canGo) leftOpts = rng()<pCut(hLen) ? [1,0] : [0,1];
+      else if(canCut)   leftOpts = [1];
+      else if(canGo)    leftOpts = [0];
+      else return false;
+    }
+
+    for(let a=0;a<leftOpts.length;a++){
+      const cut=leftOpts[a];
+      const hS = cut ? 0 : hSet;
+      const hL = cut ? 0 : hLen;
+
+      let upOpts;
+      if(r===0) upOpts=[1];
+      else if(c===forceCol) upOpts=[0];          // la columna entera no se corta
+      else{
+        const canCut = (vSet[c]===fullSet(vLen[c]));
+        const canGo  = (vLen[c]<topeV);
+        if(canCut&&canGo) upOpts = rng()<pCut(vLen[c]) ? [1,0] : [0,1];
+        else if(canCut)   upOpts = [1];
+        else if(canGo)    upOpts = [0];
+        else continue;
+      }
+
+      for(let b=0;b<upOpts.length;b++){
+        const cu=upOpts[b];
+        const oldS=vSet[c], oldL=vLen[c];
+        const vS = cu ? 0 : oldS;
+        const vL = cu ? 0 : oldL;
+
+        const scored=[];
+        const topeVal=Math.min(topeH,topeV);   // un tramo de largo L solo tiene 1..L
+        for(let v=1;v<=topeVal;v++){
+          const bit=1<<v;
+          if((hS&bit)||(vS&bit)) continue;
+          const hS2=hS|bit, hL2=hL+1, vS2=vS|bit, vL2=vL+1;
+          if(hL2>topeH || vL2>topeV) continue;
+          // le tiene que quedar lugar en la fila / columna para completar 1..max
+          if(c + (highBit(hS2)-hL2) > N-1) continue;
+          if(r + (highBit(vS2)-vL2) > N-1) continue;
+          // contra el borde el tramo se cierra si o si
+          if(c===N-1 && hS2!==fullSet(hL2)) continue;
+          if(r===N-1 && vS2!==fullSet(vL2)) continue;
+          // un tramo que quedo con huecos (ej {1,3}) no se puede cerrar y sigue
+          // creciendo: preferir los valores que lo dejan cerrable, tanto mas
+          // cuanto mas largo viene
+          let w=rng();
+          if(hS2===fullSet(hL2)) w += 1.7*pCut(hL2);
+          if(vS2===fullSet(vL2)) w += 1.7*pCut(vL2);
+          scored.push([w,v]);
+        }
+        scored.sort(function(x,y){ return y[0]-x[0]; });
+        const cand=scored.map(function(x){ return x[1]; });
+
+        for(let k=0;k<cand.length;k++){
+          const v=cand[k], bit=1<<v;
+          val[i]=v;
+          if(c>0) vW[r*(N-1)+(c-1)] = cut;
+          if(r>0) hW[(r-1)*N+c] = cu;
+          vSet[c]=vS|bit; vLen[c]=vL+1;
+          const nh = (c===N-1) ? 0 : (hS|bit);
+          const nl = (c===N-1) ? 0 : (hL+1);
+          if(rec(i+1,nh,nl)) return true;
+          vSet[c]=oldS; vLen[c]=oldL;
+          val[i]=0;
+        }
+        vSet[c]=oldS; vLen[c]=oldL;
+      }
+    }
+    return false;
+  }
+
+  if(!rec(0,0,0)) return null;
+  return {vW:vW, hW:hW, sol:Array.prototype.slice.call(val)};
+}
+
+// casillas 1x1: tramo horizontal Y vertical de largo 1 (quedan aisladas, feas)
+function countTrivialCells(ctx){
+  let t=0;
+  for(let i=0;i<ctx.n;i++){
+    if(ctx.segs[ctx.hSeg[i]].len===1 && ctx.segs[ctx.vSeg[i]].len===1) t++;
+  }
+  return t;
+}
+// casillas con el 1 forzado por cota (un tramo de largo 1): son el arranque
+function countForcedOnes(ctx){
+  let t=0;
+  for(let i=0;i<ctx.n;i++) if(ctx.maxv[i]===1) t++;
+  return t;
+}
+// Una zona rodeada de paredes por los cuatro costados es un tablero aparte
+// pegado adentro del tablero. Se detecta pidiendo que se pueda recorrer toda
+// la grilla saltando de casilla a casilla sin cruzar ninguna pared.
+function isConnected(N, vW, hW){
+  const n=N*N;
+  const vis=new Uint8Array(n);
+  const pila=[0]; vis[0]=1;
+  let cnt=1;
+  while(pila.length){
+    const i=pila.pop(), r=(i/N)|0, c=i%N;
+    if(c>0     && !vW[r*(N-1)+(c-1)] && !vis[i-1]){ vis[i-1]=1; cnt++; pila.push(i-1); }
+    if(c<N-1   && !vW[r*(N-1)+c]     && !vis[i+1]){ vis[i+1]=1; cnt++; pila.push(i+1); }
+    if(r>0     && !hW[(r-1)*N+c]     && !vis[i-N]){ vis[i-N]=1; cnt++; pila.push(i-N); }
+    if(r<N-1   && !hW[r*N+c]         && !vis[i+N]){ vis[i+N]=1; cnt++; pila.push(i+N); }
+  }
+  return cnt===n;
+}
+function segStats(ctx){
+  let sum=0, max=0, llenos=0;
+  for(let s=0;s<ctx.segs.length;s++){
+    const L=ctx.segs[s].len; sum+=L; if(L>max) max=L;
+    if(L===ctx.N) llenos++;
+  }
+  return {avg:sum/ctx.segs.length, max:max, count:ctx.segs.length,
+          llenos:llenos/ctx.segs.length};
+}
+
+// Las 8 simetrias del cuadrado: el constructor siempre pone la linea entera
+// arriba, asi que sin esto todos los tableros se pareceran entre si.
+function espejar(N, vW, hW, sol, rng){
+  let V=vW, H=hW, S=sol;
+  const modo=(rng()*8)|0;
+  if(modo&1){                                  // transponer
+    const V2=new Uint8Array(N*(N-1)), H2=new Uint8Array((N-1)*N), S2=new Array(N*N);
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++) S2[c*N+r]=S[r*N+c];
+    for(let r=0;r<N;r++) for(let c=0;c<N-1;c++) H2[c*N+r]=V[r*(N-1)+c];
+    for(let r=0;r<N-1;r++) for(let c=0;c<N;c++) V2[c*(N-1)+r]=H[r*N+c];
+    V=V2; H=H2; S=S2;
+  }
+  if(modo&2){                                  // espejo izquierda-derecha
+    const V2=new Uint8Array(N*(N-1)), H2=new Uint8Array((N-1)*N), S2=new Array(N*N);
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++) S2[r*N+c]=S[r*N+(N-1-c)];
+    for(let r=0;r<N;r++) for(let c=0;c<N-1;c++) V2[r*(N-1)+c]=V[r*(N-1)+(N-2-c)];
+    for(let r=0;r<N-1;r++) for(let c=0;c<N;c++) H2[r*N+c]=H[r*N+(N-1-c)];
+    V=V2; H=H2; S=S2;
+  }
+  if(modo&4){                                  // espejo arriba-abajo
+    const V2=new Uint8Array(N*(N-1)), H2=new Uint8Array((N-1)*N), S2=new Array(N*N);
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++) S2[r*N+c]=S[(N-1-r)*N+c];
+    for(let r=0;r<N;r++) for(let c=0;c<N-1;c++) V2[r*(N-1)+c]=V[(N-1-r)*(N-1)+c];
+    for(let r=0;r<N-1;r++) for(let c=0;c<N;c++) H2[r*N+c]=H[(N-2-r)*N+c];
+    V=V2; H=H2; S=S2;
+  }
+  return {vW:V, hW:H, sol:S};
+}
+
+// quita pistas mientras la solucion siga siendo unica
+function carve(ctx, sol, rng){
+  const given=Int32Array.from(sol);
+  const order=shuffle(Array.from({length:ctx.n},(_,i)=>i), rng);
+  for(let k=0;k<order.length;k++){
+    const i=order[k], save=given[i];
+    given[i]=0;
+    let c;
+    try{ c=countSolutions(ctx,given,2); }catch(e){ c=2; }
+    if(c!==1) given[i]=save;
+  }
+  return given;
+}
+
+// devuelve pistas de a una hasta pegarle al nivel pedido; si se pasa de facil,
+// avisa que no sirve y el generador prueba otro tablero
+function easeTo(ctx, given, sol, target, rng){
+  const g=Int32Array.from(given);
+  const hidden=[];
+  for(let i=0;i<ctx.n;i++) if(!g[i]) hidden.push(i);
+  shuffle(hidden,rng);
+  while(hidden.length){
+    const i=hidden.pop();
+    g[i]=sol[i];
+    const lvl=rateLevel(ctx,g);
+    if(lvl===target) return g;
+    if(lvl<target) g[i]=0;      // esa pista lo abarata de mas: va otra
+  }
+  return null;
+}
+
+// target: 1 facil, 2 medio, 3 dificil, 4 experto (requiere ensayo)
+function generate(N, target, seed, budgetMs){
+  const rng=makeRng(seed);
+  const t0=Date.now();
+  const limit=budgetMs||6000;
+  // el largo de los tramos es la palanca de dificultad, y sale mas barato
+  // construir tramos cortos que generar y descartar
+  let last=null;
+
+  for(let attempt=0; attempt<4000; attempt++){
+    const elapsed=Date.now()-t0;
+    if(elapsed>limit && last) break;
+    if(elapsed>limit*1.5) break;
+
+    const raw=buildBoard(N,rng,N,60000,0);
+    if(!raw) continue;
+    const b=espejar(N,raw.vW,raw.hW,raw.sol,rng);
+    if(!isConnected(N,b.vW,b.hW)) continue;   // nada de zonas encerradas
+    const ctx=buildCtx(N,b.vW,b.hW);
+    if(countTrivialCells(ctx) > 0) continue;
+    if(countForcedOnes(ctx) > Math.ceil(N*N*0.12)) continue;
+    const stats=segStats(ctx);
+    // Medido sobre un tablero real de 8x8: 24 tramos, promedio 5.33 (0.67xN) y
+    // 33% de tramos de largo N. Un tablero donde el N se usa NO puede estar
+    // muy cortado, y el promedio hay que mirarlo en proporcion a N.
+    if(stats.avg < 0.56*N || stats.avg > 0.78*N) continue;
+    if(stats.llenos < 0.18 || stats.llenos > 0.45) continue;
+    if(stats.max !== N) continue;                      // el numero N tiene que entrar
+
+    let given;
+    try{ given=carve(ctx,b.sol,rng); }catch(e){ continue; }
+
+    let level = rateLevel(ctx,given);
+    let finalGiven=given;
+
+    if(target<4 && level>target){
+      const eased=easeTo(ctx,given,b.sol,target,rng);
+      if(!eased) continue;
+      finalGiven=eased;
+      level = rateLevel(ctx,finalGiven);
+    }
+
+    // garantia dura antes de entregar: una sola solucion, y es la construida
+    let chk;
+    try{ chk=countSolutions(ctx,finalGiven,2); }catch(e){ continue; }
+    if(chk!==1) continue;
+
+    let clues=0;
+    for(let i=0;i<ctx.n;i++) if(finalGiven[i]) clues++;
+    const cand={N:N, vW:b.vW, hW:b.hW, given:Array.from(finalGiven), sol:b.sol,
+                level:level, clues:clues, seed:seed, attempts:attempt+1,
+                ms:Date.now()-t0};
+    if(level===target) return cand;
+    // el que quedo mas cerca, por si se acaba el tiempo (experto es escaso)
+    if(!last || Math.abs(level-target) < Math.abs(last.level-target)) last=cand;
+  }
+  return last;
+}
+// ==ENGINE-END==
+
+// ================= UI =====================================================
+const $ = function(s){ return document.querySelector(s); };
+const board=$("#board"), numsBox=$("#nums"), statusBox=$("#status");
+
+const G = {
+  N:8, target:2, ctx:null, puz:null,
+  val:null,
+  sel:-1, undo:[],
+  elapsed:0, tick:null, running:false, done:false,
+  flash:null
+};
+
+function fmtTime(s){
+  const m=Math.floor(s/60), r=s%60;
+  return String(m).padStart(2,"0")+":"+String(r).padStart(2,"0");
+}
+function stopTimer(){ if(G.tick){ clearInterval(G.tick); G.tick=null; } G.running=false; }
+function startTimer(){
+  stopTimer();
+  G.running=true;
+  G.tick=setInterval(function(){
+    if(!G.running) return;
+    G.elapsed++; $("#timer").textContent=fmtTime(G.elapsed);
+    if((G.elapsed%5)===0) save();
+  },1000);
+}
+
+function newGame(N, target){
+  $("#busy").classList.add("on");
+  // sin requestAnimationFrame: en una pestaña de fondo no se dispara nunca y el
+  // juego se queda colgado en "Generando..."
+  setTimeout(function(){
+    const seed=(Date.now()^(Math.random()*0xffffffff))>>>0;
+    let puz=null;
+    try{ puz=generate(N,target,seed,6000); }catch(e){}
+    $("#busy").classList.remove("on");
+    if(!puz){ setStatus("No pude generar un puzzle de ese tipo, proba de nuevo.","err"); return; }
+    loadPuzzle(puz);
+  },50);
+}
+
+function loadPuzzle(puz){
+  G.N=puz.N; G.puz=puz;
+  G.ctx=buildCtx(puz.N,Uint8Array.from(puz.vW),Uint8Array.from(puz.hW));
+  G.val=Int32Array.from(puz.given);
+  G.sel=-1; G.undo=[]; G.done=false; G.elapsed=0; G.flash=null;
+  $("#timer").textContent="00:00";
+  $("#size").value=String(puz.N);
+  renderAll();
+  startTimer();
+  const names=["","Facil","Medio","Dificil","Experto"];
+  setStatus(puz.N+"x"+puz.N+" - "+names[puz.level||G.target]+" - "+puz.clues+" pistas");
+  save();
+}
+
+function layout(){
+  const N=G.N;
+  const angosto = window.innerWidth<=860;
+  board.style.setProperty("--n",N);
+  // en el celu la botonera va abajo en 2 lineas
+  document.documentElement.style.setProperty("--padcols", Math.ceil(N/2));
+
+  // Nada de restar constantes a ojo: la barra se parte en 2 filas segun el
+  // ancho y la botonera cambia de lugar y de alto. Se mide donde EMPIEZA el
+  // tablero y cuanto ocupa lo que va abajo.
+  const app=document.querySelector(".app");
+  const stage=document.querySelector(".stage");
+  const pad=document.querySelector(".pad");
+  const num=function(x){ const v=parseFloat(x); return isNaN(v)?0:v; };
+
+  const arriba = stage.getBoundingClientRect().top + window.scrollY;
+  const abajo  = statusBox.offsetHeight + num(getComputedStyle(statusBox).marginTop)
+               + num(getComputedStyle(app).paddingBottom);
+  const gap    = num(getComputedStyle(stage).gap) || 16;
+  const dispH  = window.innerHeight - arriba - abajo - (angosto ? pad.offsetHeight+gap : 0) - 2;
+  const dispW  = app.clientWidth - (angosto ? 0 : pad.offsetWidth+gap) - 2;
+
+  const lado = Math.min(dispW, dispH);
+  const cell = Math.max(24, Math.min(72, Math.floor((lado-(N-1)-6)/N)));
+  board.style.setProperty("--cell",cell+"px");
+}
+
+function renderAll(){
+  const ctx=G.ctx, N=G.N;
+  layout();
+  board.innerHTML="";
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<ctx.n;i++){
+    const r=(i/N)|0, c=i%N;
+    const d=document.createElement("div");
+    d.className="cell";
+    d.dataset.i=i;
+    if(c<N-1 && ctx.vW[r*(N-1)+c]) d.classList.add("wr");
+    if(r<N-1 && ctx.hW[r*N+c]) d.classList.add("wb");
+    const v=document.createElement("div"); v.className="val";
+    d.appendChild(v);
+    frag.appendChild(d);
+  }
+  board.appendChild(frag);
+  buildPad();
+  layout();          // de nuevo: recien ahora la botonera tiene su alto final
+  paint();
+}
+
+function buildPad(){
+  numsBox.innerHTML="";
+  for(let k=1;k<=G.N;k++){
+    const b=document.createElement("button");
+    b.textContent=k; b.dataset.v=k;
+    numsBox.appendChild(b);
+  }
+}
+
+function conflicts(){
+  const bad=new Set(), ctx=G.ctx;
+  for(let s=0;s<ctx.segs.length;s++){
+    const seg=ctx.segs[s], seen={};
+    for(let k=0;k<seg.cells.length;k++){
+      const i=seg.cells[k], v=G.val[i];
+      if(!v) continue;
+      if(v>seg.len){ bad.add(i); continue; }
+      if(seen[v]!==undefined){ bad.add(i); bad.add(seen[v]); }
+      else seen[v]=i;
+    }
+  }
+  return bad;
+}
+
+function paint(){
+  const ctx=G.ctx, cells=board.children;
+  const bad=conflicts();
+  const flash=G.flash;
+  const selH = G.sel>=0 ? ctx.hSeg[G.sel] : -1;
+  const selV = G.sel>=0 ? ctx.vSeg[G.sel] : -1;
+
+  for(let i=0;i<ctx.n;i++){
+    const el=cells[i];
+    const inSeg = G.sel>=0 && (ctx.hSeg[i]===selH || ctx.vSeg[i]===selV);
+    el.className="cell"
+      + (ctx.vW[((i/G.N)|0)*(G.N-1)+(i%G.N)] && (i%G.N)<G.N-1 ? " wr":"")
+      + (((i/G.N)|0)<G.N-1 && ctx.hW[i] ? " wb":"")
+      + (G.puz.given[i] ? " given":"")
+     + (inSeg && i!==G.sel ? " inseg":"")
+      + (i===G.sel ? " sel":"")
+      + ((bad.has(i) || (flash && flash.has(i))) ? " bad":"");
+
+    const v=G.val[i];
+    const vEl=el.querySelector(".val");
+    vEl.textContent = v ? v : "";
+    vEl.classList.toggle("d2", v>=10);
+  }
+
+  const btns=numsBox.children;
+  for(let k=0;k<btns.length;k++){
+    btns[k].classList.toggle("used", G.sel>=0 && G.val[G.sel]===k+1);
+  }
+
+  checkWin(bad);
+}
+
+function checkWin(bad){
+  if(G.done) return;
+  for(let i=0;i<G.ctx.n;i++) if(!G.val[i]) return;
+  if(bad.size) { setStatus("Completo pero hay repetidos marcados.","err"); return; }
+  G.done=true; stopTimer();
+  setStatus("¡Resuelto en "+fmtTime(G.elapsed)+"!","win");
+  try{ localStorage.removeItem("jup.save"); }catch(e){}
+}
+
+function setStatus(t,cls){
+  statusBox.textContent=t;
+  statusBox.className="status"+(cls?" "+cls:"");
+}
+
+function pushUndo(i){
+  G.undo.push({i:i, v:G.val[i]});
+  if(G.undo.length>400) G.undo.shift();
+}
+
+function flashNum(v){
+  const b = v ? numsBox.querySelector('button[data-v="'+v+'"]') : $("#btnErase");
+  if(!b) return;
+  b.classList.remove("nope");
+  void b.offsetWidth;                  // reinicia la animacion si repite el click
+  b.classList.add("nope");
+  setTimeout(function(){ b.classList.remove("nope"); },300);
+}
+
+function setValue(v){
+  const i=G.sel;
+  if(G.done) return;
+  if(i<0){ flashNum(v); setStatus("Elegi primero una casilla."); return; }
+  if(G.puz.given[i]){ flashNum(v); return; }
+  if(v>G.ctx.maxv[i]){ flashNum(v); return; }
+  pushUndo(i);
+  if(v===0) G.val[i]=0;
+  else G.val[i] = (G.val[i]===v) ? 0 : v;   // tocar de nuevo el mismo lo borra
+  G.flash=null;
+  paint(); save();
+}
+
+function select(i){
+  G.sel=i;
+  G.flash=null;
+  paint();
+}
+
+function undo(){
+  const u=G.undo.pop();
+  if(!u) return;
+  G.val[u.i]=u.v;
+  G.sel=u.i; G.done=false;
+  if(!G.running) startTimer();
+  G.flash=null;
+  paint(); save();
+}
+
+function verify(){
+  const wrong=new Set();
+  for(let i=0;i<G.ctx.n;i++) if(G.val[i] && G.val[i]!==G.puz.sol[i]) wrong.add(i);
+  if(!wrong.size){ setStatus("Todo lo puesto hasta ahora esta bien."); G.flash=null; paint(); return; }
+  G.flash=wrong;
+  setStatus(wrong.size+(wrong.size===1?" numero mal puesto.":" numeros mal puestos."),"err");
+  paint();
+  setTimeout(function(){ if(G.flash===wrong){ G.flash=null; paint(); } },2500);
+}
+
+function resetGame(){
+  if(!G.puz) return;
+  G.val=Int32Array.from(G.puz.given);
+  G.undo=[]; G.done=false; G.elapsed=0; G.flash=null;
+  $("#timer").textContent="00:00";
+  startTimer(); paint(); save();
+  setStatus("Reiniciado.");
+}
+
+// --- guardado -------------------------------------------------------------
+function save(){
+  if(!G.puz) return;
+  try{
+    localStorage.setItem("jup.save", JSON.stringify({
+      puz:{N:G.puz.N, vW:Array.from(G.puz.vW), hW:Array.from(G.puz.hW),
+           given:Array.from(G.puz.given), sol:Array.from(G.puz.sol),
+           level:G.puz.level, clues:G.puz.clues},
+      val:Array.from(G.val),
+      elapsed:G.elapsed, target:G.target
+    }));
+  }catch(e){}
+}
+function restore(){
+  let d;
+  try{ d=JSON.parse(localStorage.getItem("jup.save")||"null"); }catch(e){ d=null; }
+  if(!d || !d.puz) return false;
+  loadPuzzle(d.puz);
+  G.val=Int32Array.from(d.val);
+  G.elapsed=d.elapsed||0;
+  G.target=d.target||2;
+  $("#diff").value=String(G.target);
+  $("#timer").textContent=fmtTime(G.elapsed);
+  paint();
+  setStatus("Partida retomada.");
+  return true;
+}
+
+// --- eventos --------------------------------------------------------------
+board.addEventListener("click", function(e){
+  const c=e.target.closest(".cell");
+  if(!c) return;
+  select(+c.dataset.i);
+});
+numsBox.addEventListener("click", function(e){
+  const b=e.target.closest("button");
+  if(!b || b.disabled) return;
+  setValue(+b.dataset.v);
+});
+$("#btnErase").onclick=function(){ setValue(0); };
+$("#btnNew").onclick=function(){
+  G.N=+$("#size").value; G.target=+$("#diff").value;
+  newGame(G.N,G.target);
+};
+$("#btnUndo").onclick=undo;
+$("#btnCheck").onclick=verify;
+$("#btnReset").onclick=resetGame;
+$("#btnHelp").onclick=function(){ $("#help").showModal(); };
+$("#helpClose").onclick=function(){ $("#help").close(); };
+window.addEventListener("resize", function(){ if(G.ctx){ layout(); } });
+
+document.addEventListener("keydown", function(e){
+  if($("#help").open) return;
+  if(e.target.tagName==="SELECT") return;
+  const N=G.N;
+  if(e.key>="1" && e.key<="9"){ setValue(+e.key); e.preventDefault(); return; }
+  if(e.key==="0"){ if(N>=10) setValue(10); e.preventDefault(); return; }
+  if(e.key==="Backspace"||e.key==="Delete"){ setValue(0); e.preventDefault(); return; }
+  const move={ArrowUp:-N,ArrowDown:N,ArrowLeft:-1,ArrowRight:1}[e.key];
+  if(move!==undefined && G.sel>=0){
+    const r=(G.sel/N)|0, c=G.sel%N;
+    let nr=r, nc=c;
+    if(e.key==="ArrowUp") nr--; if(e.key==="ArrowDown") nr++;
+    if(e.key==="ArrowLeft") nc--; if(e.key==="ArrowRight") nc++;
+    if(nr>=0&&nr<N&&nc>=0&&nc<N) select(nr*N+nc);
+    e.preventDefault();
+  }
+});
+
+// ejemplo del modal de ayuda (el 4x4 del instructivo)
+(function(){
+  const sol=[4,3,2,1, 1,2,1,2, 2,4,1,3, 3,1,2,1];
+  const wr=new Set([1,5,9,13,14]);   // pared a la derecha
+  const wb=new Set([3,6,7]);         // pared abajo
+  const g=$("#exGrid");
+  for(let i=0;i<16;i++){
+    const d=document.createElement("div");
+    d.textContent=sol[i];
+    if(wr.has(i)) d.classList.add("wr");
+    if(wb.has(i)) d.classList.add("wb");
+    g.appendChild(d);
+  }
+})();
+
+// ?n=10&d=3 arranca directo en ese tamaño y dificultad (sirve para probar)
+(function(){
+  const q=new URLSearchParams(location.search);
+  const n=+q.get("n"), d=+q.get("d");
+  if(n>=6 && n<=10){
+    G.N=n; G.target=(d>=1&&d<=4)?d:2;
+    $("#size").value=String(G.N); $("#diff").value=String(G.target);
+    newGame(G.N,G.target);
+    return;
+  }
+  if(!restore()) newGame(8,2);
+})();
+</script>
