@@ -79,12 +79,12 @@
 
   .pad{
     background:var(--pad); border:1px solid var(--line); border-radius:8px;
-    padding:10px; display:flex; flex-direction:column; gap:8px; width:172px; flex:0 0 auto;
+    padding:10px; display:flex; flex-direction:column; gap:8px; width:200px; flex:0 0 auto;
   }
   .pad .title{font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--ink-soft)}
-  .nums{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+  .nums{display:grid; grid-template-columns:1fr 1fr; gap:8px}
   .nums button{
-    font:600 20px/1 "Segoe UI",system-ui,sans-serif; height:44px;
+    font:600 24px/1 "Segoe UI",system-ui,sans-serif; height:60px;
     border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink);
     cursor:pointer; font-variant-numeric:tabular-nums;
   }
@@ -99,7 +99,7 @@
   .btn.nope, .nums button.nope{
     animation:nope .22s ease; background:#fbe3e1; border-color:var(--bad); color:var(--bad);
   }
-  .pad .wide{width:100%}
+  .pad .wide{width:100%; padding:11px 12px}
   .pad .sep{height:1px; background:var(--line); margin:2px 0}
 
   .status{
