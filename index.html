@@ -767,8 +767,6 @@ function generate(N, target, seed, budgetMs){
   const rng=makeRng(seed);
   const t0=Date.now();
   const limit=budgetMs||6000;
-  // el largo de los tramos es la palanca de dificultad, y sale mas barato
-  // construir tramos cortos que generar y descartar
   let last=null;
 
   for(let attempt=0; attempt<4000; attempt++){
